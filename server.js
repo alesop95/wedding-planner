@@ -5,20 +5,25 @@ const bodyParser = require("body-parser");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Configurazione: URL del webhook Apps Script e token
-const WEBHOOK_URL = process.env.WEBHOOK_URL || "https://script.google.com/macros/s/YOUR_WEBHOOK_ID/exec";
-const WEBHOOK_TOKEN = process.env.WEBHOOK_TOKEN || "2f8c9c85-3d48-47d7-9a1d-91b032e67b4e";
+// Legge variabili di ambiente
+const WEBHOOK_URL = process.env.WEBHOOK_URL;
+const WEBHOOK_TOKEN = process.env.WEBHOOK_TOKEN;
 
-// Middleware per JSON
+// Controllo rapido: se non settate, log errore
+if (!WEBHOOK_URL || !WEBHOOK_TOKEN) {
+  console.error("ERROR: WEBHOOK_URL o WEBHOOK_TOKEN non settati come environment variables");
+  process.exit(1);
+}
+
 app.use(bodyParser.json());
 
-// Log semplice di tutte le richieste ricevute
+// Log richieste
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} from ${req.ip}`);
   next();
 });
 
-// Endpoint per ricevere form dagli invitati
+// Endpoint per ricevere dati dal frontend invitati
 app.post("/api/form", async (req, res) => {
   try {
     const { sheet, values } = req.body;
@@ -27,17 +32,13 @@ app.post("/api/form", async (req, res) => {
       return res.status(400).json({ ok: false, error: "Missing sheet or values array" });
     }
 
-    // Invia dati al webhook Google Sheet
-    const response = await axios.post(WEBHOOK_URL, {
-      sheet,
-      values
-    }, {
+    // Invia al webhook Google Sheet
+    const response = await axios.post(WEBHOOK_URL, { sheet, values }, {
       params: { token: WEBHOOK_TOKEN },
       headers: { "Content-Type": "application/json" }
     });
 
     console.log("Webhook response:", response.data);
-
     res.json({ ok: true, webhook: response.data });
   } catch (err) {
     console.error("Error sending to webhook:", err.message);
@@ -46,11 +47,8 @@ app.post("/api/form", async (req, res) => {
 });
 
 // Health check
-app.get("/", (req, res) => {
-  res.send("Wedding backend is running!");
-});
+app.get("/", (req, res) => res.send("Wedding backend running!"));
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-
